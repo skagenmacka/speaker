@@ -37,14 +37,14 @@ int main(/* int argc, char **argv */) {
   control::control_server server(state);
   server.start("0.0.0.0", 8080);
 
-  constexpr int sampleRate = 44100;
+  constexpr int sample_rate = 44100;
   constexpr int channels = 2;
-  constexpr float bufferSeconds = .2f;
-  audio::ring_buffer rb(static_cast<size_t>(sampleRate) * channels *
-                        bufferSeconds);
+  constexpr float buffer_seconds = .2f;
+  audio::ring_buffer rb(static_cast<size_t>(sample_rate) * channels *
+                        buffer_seconds);
 
   audio::port_audio_output out;
-  out.start(rb, audio::port_audio_output::config{.sampleRate = sampleRate,
+  out.start(rb, audio::port_audio_output::config{.sampleRate = sample_rate,
                                                  .channels = channels,
                                                  .framesPerBuffer = 512});
 
