@@ -1,10 +1,13 @@
 #include "audio/port_audio_output.h"
 #include "audio/ring_buffer.h"
+
 #include "control/control_server.h"
+
 #include "dsp/dc_blocker.h"
 #include "dsp/distortion.h"
 #include "dsp/effect_chain.h"
 #include "dsp/gain.h"
+#include "dsp/reverb.h"
 
 #include <chrono>
 #include <cstdint>
@@ -27,6 +30,7 @@ int main(/* int argc, char **argv */) {
   // dsp::Gain gain;
   // gain.set_db(gainDb);
   dsp::EffectChain effect_chain;
+  effect_chain.add(std::make_unique<dsp::reverb>());
   effect_chain.add(std::make_unique<dsp::distortion>());
   effect_chain.add(std::make_unique<dsp::dc_blocker>());
 
