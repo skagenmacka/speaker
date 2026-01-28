@@ -1,35 +1,42 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useQuery } from '@tanstack/react-query';
+
+const API_URL = 'http://localhost:8080';
+
+interface State {
+  gain_db: number;
+
+  reverb_delay_ms: number;
+  reverb_feedback: number;
+  reverb_wet: number;
+  reverb_dry: number;
+};
 
 function App() {
-  const [count, setCount] = useState(0)
+  const {
+    data,
+    isError,
+    isPending,
+    error
+  } = useQuery<State>({
+    queryKey: ['state'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/state`);
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      return (await response.json()) as State;
+    },
+  });
 
   return (
     <>
       <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        {isPending && <p>Loading...</p>}
+        {isError && <p>Error: {(error as Error).message}</p>}
+        {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }
 
-export default App
+export default App;

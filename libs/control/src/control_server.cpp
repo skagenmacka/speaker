@@ -3,6 +3,7 @@
 // cpp-httplib
 #include "httplib.h"
 
+#include <atomic>
 #include <sstream>
 
 namespace control {
@@ -14,19 +15,59 @@ void control_server::start(const std::string &host, int port) {
   thread = std::thread([this, host, port]() {
     httplib::Server svr;
 
+    // CORS (dev): allow controller UI on localhost:5173
+    svr.set_default_headers({
+        {"Access-Control-Allow-Origin", "http://localhost:5173"},
+        {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"},
+        {"Access-Control-Allow-Headers", "Content-Type"},
+    });
+
+    // Preflight
+    svr.Options(R"(.*)", [](const httplib::Request &, httplib::Response &res) {
+      res.status = 204;
+    });
+
     // GET /health
     svr.Get("/health", [](const httplib::Request &, httplib::Response &res) {
       res.set_content("ok\n", "text/plain");
     });
 
-    // GET /gain
-    svr.Get("/gain", [this](const httplib::Request &, httplib::Response &res) {
-      float db = 0.0f;
-      if (state.gain_db)
-        db = state.gain_db->load(std::memory_order_relaxed);
+    // GET /state
+    svr.Get("/state", [this](const httplib::Request &, httplib::Response &res) {
+      float gain_db = 0.0f;
+      if (state.gain_db) {
+        gain_db = state.gain_db->load(std::memory_order_relaxed);
+      }
+
+      float reverb_delay_ms = 0.0f, reverb_feedback = 0.0f, reverb_wet = 0.0f,
+            reverb_dry = 0.0f;
+      if (state.reverb_delay_ms) {
+        reverb_delay_ms =
+            state.reverb_delay_ms->load(std::memory_order_relaxed);
+      }
+      if (state.reverb_feedback) {
+        reverb_feedback =
+            state.reverb_feedback->load(std::memory_order_relaxed);
+      }
+      if (state.reverb_wet) {
+        reverb_wet = state.reverb_wet->load(std::memory_order_relaxed);
+      }
+      if (state.reverb_dry) {
+        reverb_dry = state.reverb_dry->load(std::memory_order_relaxed);
+      }
 
       std::ostringstream os;
-      os << "{ \"gain_db\": " << db << " }\n";
+      os << "{";
+
+      os << "\"gain_db\":" << gain_db << ",";
+
+      os << "\"reverb_delay_ms\":" << reverb_delay_ms << ",";
+      os << "\"reverb_feedback\":" << reverb_feedback << ",";
+      os << "\"reverb_wet\":" << reverb_wet << ",";
+      os << "\"reverb_dry\":" << reverb_dry;
+
+      os << "}";
+
       res.set_content(os.str(), "application/json");
     });
 
