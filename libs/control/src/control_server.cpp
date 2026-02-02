@@ -18,7 +18,7 @@ void control_server::start(const std::string &host, int port) {
     // CORS (dev): allow controller UI on localhost:5173
     svr.set_default_headers({
         {"Access-Control-Allow-Origin", "http://localhost:5173"},
-        {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"},
+        {"Access-Control-Allow-Methods", "GET, POST, OPTIONS, PATCH"},
         {"Access-Control-Allow-Headers", "Content-Type"},
     });
 
@@ -100,6 +100,60 @@ void control_server::start(const std::string &host, int port) {
                  res.set_content("invalid db\n", "text/plain");
                }
              });
+
+    // PATCH /state?gain_db=-6&reverb_wet=0.2
+    svr.Patch("/state", [this](const httplib::Request &req,
+                               httplib::Response &res) {
+      int updated = 0;
+      auto apply = [&](const char *name, std::atomic<float> *target,
+                       float min_v, float max_v, bool clamp) -> bool {
+        if (!req.has_param(name))
+          return true;
+        if (!target) {
+          res.status = 500;
+          res.set_content("param not configured\n", "text/plain");
+          return false;
+        }
+        try {
+          float v = std::stof(req.get_param_value(name));
+          if (clamp) {
+            if (v < min_v)
+              v = min_v;
+            if (v > max_v)
+              v = max_v;
+          }
+          target->store(v, std::memory_order_relaxed);
+          updated++;
+          return true;
+        } catch (...) {
+          res.status = 400;
+          res.set_content("invalid param\n", "text/plain");
+          return false;
+        }
+      };
+
+      if (!apply("gain_db", state.gain_db, -60.0f, 12.0f, true))
+        return;
+      if (!apply("reverb_delay_ms", state.reverb_delay_ms, 0.0f, 2000.0f, true))
+        return;
+      if (!apply("reverb_feedback", state.reverb_feedback, 0.0f, 1.0f, true))
+        return;
+      if (!apply("reverb_wet", state.reverb_wet, 0.0f, 1.0f, true))
+        return;
+      if (!apply("reverb_dry", state.reverb_dry, 0.0f, 1.0f, true))
+        return;
+      if (!apply("dc_blocker_cutoff_hz", state.dc_blocker_cutoff_hz, 1.0f,
+                 2000.0f, true))
+        return;
+
+      if (updated == 0) {
+        res.status = 400;
+        res.set_content("no params\n", "text/plain");
+        return;
+      }
+
+      res.set_content("ok\n", "text/plain");
+    });
 
     // Blockande lyssning (kör i separat tråd)
     svr.listen(host, port);
