@@ -29,6 +29,6 @@ public:
 private:
   float drive = 10.0; // [1, 20]
   float mix = 1.0;    // [0, 1]
-  float out = 0.3;    // output gain (volume)
+  float out = 1.0;    // output gain (volume)
 };
 } // namespace dsp

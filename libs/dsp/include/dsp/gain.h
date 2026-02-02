@@ -4,7 +4,7 @@
 
 namespace dsp {
 
-class Gain {
+class gain {
 public:
   void set_db(float db) {
     db_ = std::clamp(db, -80.0f, 12.0f);

@@ -1,11 +1,15 @@
 #include "audio/port_audio_output.h"
 #include "audio/ring_buffer.h"
+
 #include "control/control_server.h"
+
 #include "dsp/dc_blocker.h"
 #include "dsp/distortion.h"
 #include "dsp/effect_chain.h"
 #include "dsp/gain.h"
+#include "dsp/reverb.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -22,24 +26,40 @@ int main(/* int argc, char **argv */) {
 
   // shared state
   std::atomic<float> gain_db{0.0f};
-
-  // dsp
-  // dsp::Gain gain;
-  // gain.set_db(gainDb);
-  dsp::EffectChain effect_chain;
-  effect_chain.add(std::make_unique<dsp::distortion>());
-  effect_chain.add(std::make_unique<dsp::dc_blocker>());
-
-  // control server
-  control::control_state state;
-  state.gain_db = &gain_db;
-
-  control::control_server server(state);
-  server.start("0.0.0.0", 8080);
+  std::atomic<float> reverb_delay_ms{120.0f};
+  std::atomic<float> reverb_feedback{0.25f};
+  std::atomic<float> reverb_wet{0.55f};
+  std::atomic<float> reverb_dry{0.8f};
+  std::atomic<float> dc_blocker_cutoff_hz{10.0f};
 
   constexpr int sample_rate = 44100;
   constexpr int channels = 2;
   constexpr float buffer_seconds = .2f;
+
+  // dsp
+  dsp::gain gain;
+  dsp::EffectChain effect_chain;
+  auto reverb = std::make_unique<dsp::reverb>(sample_rate, 2000.0f, channels);
+  auto *reverb_ptr = reverb.get();
+  effect_chain.add(std::move(reverb));
+  effect_chain.add(std::make_unique<dsp::distortion>());
+  auto dc_blocker = std::make_unique<dsp::dc_blocker>(
+      dc_blocker_cutoff_hz.load(std::memory_order_relaxed));
+  auto *dc_blocker_ptr = dc_blocker.get();
+  effect_chain.add(std::move(dc_blocker));
+
+  // control server
+  control::control_state state;
+  state.gain_db = &gain_db;
+  state.reverb_delay_ms = &reverb_delay_ms;
+  state.reverb_feedback = &reverb_feedback;
+  state.reverb_wet = &reverb_wet;
+  state.reverb_dry = &reverb_dry;
+  state.dc_blocker_cutoff_hz = &dc_blocker_cutoff_hz;
+
+  control::control_server server(state);
+  server.start("0.0.0.0", 8080);
+
   audio::ring_buffer rb(static_cast<size_t>(sample_rate) * channels *
                         buffer_seconds);
 
@@ -70,6 +90,18 @@ int main(/* int argc, char **argv */) {
     for (size_t i = 0; i < samples; i++) {
       buf[i] = s16_to_float(in[i]);
     }
+
+    gain.set_db(gain_db.load(std::memory_order_relaxed));
+    for (size_t i = 0; i < samples; i++) {
+      buf[i] = gain.process(buf[i]);
+    }
+
+    reverb_ptr->setDelayMs(reverb_delay_ms.load(std::memory_order_relaxed));
+    reverb_ptr->setFeedback(reverb_feedback.load(std::memory_order_relaxed));
+    reverb_ptr->setWet(reverb_wet.load(std::memory_order_relaxed));
+    reverb_ptr->setDry(reverb_dry.load(std::memory_order_relaxed));
+    dc_blocker_ptr->set_cutoff(
+        dc_blocker_cutoff_hz.load(std::memory_order_relaxed));
 
     effect_chain.process(buf.data(), frames, channels);
 
