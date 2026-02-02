@@ -144,7 +144,7 @@ function App() {
         />
         <RulerPicker
           min={0}
-          max={100}
+          max={200}
           step={5}
           suffix="hz"
           value={dcBlockerCutoffHz}

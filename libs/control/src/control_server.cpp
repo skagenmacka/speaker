@@ -62,6 +62,17 @@ void control_server::start(const std::string &host, int port) {
             state.dc_blocker_cutoff_hz->load(std::memory_order_relaxed);
       }
 
+      float eq_low_db = 0.0f, eq_mid_db = 0.0f, eq_high_db = 0.0f;
+      if (state.eq_low_db) {
+        eq_low_db = state.eq_low_db->load(std::memory_order_relaxed);
+      }
+      if (state.eq_mid_db) {
+        eq_mid_db = state.eq_mid_db->load(std::memory_order_relaxed);
+      }
+      if (state.eq_high_db) {
+        eq_high_db = state.eq_high_db->load(std::memory_order_relaxed);
+      }
+
       std::ostringstream os;
       os << "{";
 
@@ -71,7 +82,11 @@ void control_server::start(const std::string &host, int port) {
       os << "\"reverb_feedback\":" << reverb_feedback << ",";
       os << "\"reverb_wet\":" << reverb_wet << ",";
       os << "\"reverb_dry\":" << reverb_dry << ",";
-      os << "\"dc_blocker_cutoff_hz\":" << dc_blocker_cutoff_hz;
+      os << "\"dc_blocker_cutoff_hz\":" << dc_blocker_cutoff_hz << ",";
+
+      os << "\"eq_low_db\":" << eq_low_db << ",";
+      os << "\"eq_mid_db\":" << eq_mid_db << ",";
+      os << "\"eq_high_db\":" << eq_high_db;
 
       os << "}";
 
@@ -151,6 +166,12 @@ void control_server::start(const std::string &host, int port) {
         return;
       if (!apply("dc_blocker_cutoff_hz", state.dc_blocker_cutoff_hz, 1.0f,
                  2000.0f, true))
+        return;
+      if (!apply("eq_low_db", state.eq_low_db, -12.0f, 12.0f, true))
+        return;
+      if (!apply("eq_mid_db", state.eq_mid_db, -12.0f, 12.0f, true))
+        return;
+      if (!apply("eq_high_db", state.eq_high_db, -12.0f, 12.0f, true))
         return;
 
       if (updated == 0) {

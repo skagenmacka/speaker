@@ -21,6 +21,11 @@ struct control_state {
 
   // dc blocker
   std::atomic<float> *dc_blocker_cutoff_hz = nullptr;
+
+  // eq
+  std::atomic<float> *eq_low_db = nullptr;
+  std::atomic<float> *eq_mid_db = nullptr;
+  std::atomic<float> *eq_high_db = nullptr;
 };
 
 class control_server {
