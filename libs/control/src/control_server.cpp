@@ -56,6 +56,12 @@ void control_server::start(const std::string &host, int port) {
         reverb_dry = state.reverb_dry->load(std::memory_order_relaxed);
       }
 
+      float dc_blocker_cutoff_hz = 0.0f;
+      if (state.dc_blocker_cutoff_hz) {
+        dc_blocker_cutoff_hz =
+            state.dc_blocker_cutoff_hz->load(std::memory_order_relaxed);
+      }
+
       std::ostringstream os;
       os << "{";
 
@@ -64,7 +70,8 @@ void control_server::start(const std::string &host, int port) {
       os << "\"reverb_delay_ms\":" << reverb_delay_ms << ",";
       os << "\"reverb_feedback\":" << reverb_feedback << ",";
       os << "\"reverb_wet\":" << reverb_wet << ",";
-      os << "\"reverb_dry\":" << reverb_dry;
+      os << "\"reverb_dry\":" << reverb_dry << ",";
+      os << "\"dc_blocker_cutoff_hz\":" << dc_blocker_cutoff_hz;
 
       os << "}";
 

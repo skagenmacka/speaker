@@ -146,7 +146,7 @@ function App() {
           min={0}
           max={100}
           step={5}
-          suffix="Hz"
+          suffix="hz"
           value={dcBlockerCutoffHz}
           onChange={setDcBlockerCutoffHz}
         />
