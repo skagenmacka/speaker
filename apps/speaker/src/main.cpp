@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 static float s16_to_float(int16_t v) {
@@ -35,6 +36,8 @@ int main(/* int argc, char **argv */) {
   std::atomic<float> eq_low_db{10.0f};
   std::atomic<float> eq_mid_db{0.0f};
   std::atomic<float> eq_high_db{0.0f};
+  std::string now_playing;
+  std::mutex now_playing_mutex;
 
   constexpr int sample_rate = 44100;
   constexpr int channels = 2;
@@ -70,6 +73,8 @@ int main(/* int argc, char **argv */) {
   state.eq_low_db = &eq_low_db;
   state.eq_mid_db = &eq_mid_db;
   state.eq_high_db = &eq_high_db;
+  state.now_playing = &now_playing;
+  state.now_playing_mutex = &now_playing_mutex;
 
   control::control_server server(state);
   server.start("0.0.0.0", 8080);

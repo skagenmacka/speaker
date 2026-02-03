@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -26,6 +27,10 @@ struct control_state {
   std::atomic<float> *eq_low_db = nullptr;
   std::atomic<float> *eq_mid_db = nullptr;
   std::atomic<float> *eq_high_db = nullptr;
+
+  // now playing
+  std::string *now_playing = nullptr;
+  std::mutex *now_playing_mutex = nullptr;
 };
 
 class control_server {

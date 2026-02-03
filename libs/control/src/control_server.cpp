@@ -4,7 +4,96 @@
 #include "httplib.h"
 
 #include <atomic>
+#include <cctype>
 #include <sstream>
+
+namespace {
+
+std::string json_escape(const std::string &in) {
+  std::string out;
+  out.reserve(in.size() + 8);
+  for (char ch : in) {
+    switch (ch) {
+    case '\\':
+      out += "\\\\";
+      break;
+    case '"':
+      out += "\\\"";
+      break;
+    case '\n':
+      out += "\\n";
+      break;
+    case '\r':
+      out += "\\r";
+      break;
+    case '\t':
+      out += "\\t";
+      break;
+    default:
+      if (static_cast<unsigned char>(ch) < 0x20) {
+        // skip other control chars
+      } else {
+        out += ch;
+      }
+    }
+  }
+  return out;
+}
+
+bool parse_json_name(const std::string &body, std::string &out) {
+  const std::string key = "\"name\"";
+  const size_t key_pos = body.find(key);
+  if (key_pos == std::string::npos) {
+    return false;
+  }
+  size_t pos = body.find(':', key_pos + key.size());
+  if (pos == std::string::npos) {
+    return false;
+  }
+  pos++;
+  while (pos < body.size() && std::isspace(static_cast<unsigned char>(body[pos]))) {
+    pos++;
+  }
+  if (pos >= body.size() || body[pos] != '"') {
+    return false;
+  }
+  pos++;
+  std::string value;
+  while (pos < body.size()) {
+    char ch = body[pos++];
+    if (ch == '\\' && pos < body.size()) {
+      char esc = body[pos++];
+      switch (esc) {
+      case '"':
+      case '\\':
+      case '/':
+        value += esc;
+        break;
+      case 'n':
+        value += '\n';
+        break;
+      case 'r':
+        value += '\r';
+        break;
+      case 't':
+        value += '\t';
+        break;
+      default:
+        value += esc;
+        break;
+      }
+      continue;
+    }
+    if (ch == '"') {
+      out = value;
+      return true;
+    }
+    value += ch;
+  }
+  return false;
+}
+
+} // namespace
 
 namespace control {
 
@@ -73,6 +162,12 @@ void control_server::start(const std::string &host, int port) {
         eq_high_db = state.eq_high_db->load(std::memory_order_relaxed);
       }
 
+      std::string now_playing;
+      if (state.now_playing && state.now_playing_mutex) {
+        std::lock_guard<std::mutex> lock(*state.now_playing_mutex);
+        now_playing = *state.now_playing;
+      }
+
       std::ostringstream os;
       os << "{";
 
@@ -86,7 +181,9 @@ void control_server::start(const std::string &host, int port) {
 
       os << "\"eq_low_db\":" << eq_low_db << ",";
       os << "\"eq_mid_db\":" << eq_mid_db << ",";
-      os << "\"eq_high_db\":" << eq_high_db;
+      os << "\"eq_high_db\":" << eq_high_db << ",";
+
+      os << "\"now_playing\":\"" << json_escape(now_playing) << "\"";
 
       os << "}";
 
@@ -182,6 +279,37 @@ void control_server::start(const std::string &host, int port) {
 
       res.set_content("ok\n", "text/plain");
     });
+
+    // POST /now_playing?name=...
+    svr.Post("/now_playing",
+             [this](const httplib::Request &req, httplib::Response &res) {
+               if (!state.now_playing || !state.now_playing_mutex) {
+                 res.status = 500;
+                 res.set_content("now_playing not configured\n", "text/plain");
+                 return;
+               }
+
+               std::string name;
+               bool got = false;
+               if (req.has_param("name")) {
+                 name = req.get_param_value("name");
+                 got = true;
+               } else if (!req.body.empty()) {
+                 got = parse_json_name(req.body, name);
+               }
+
+               if (!got) {
+                 res.status = 400;
+                 res.set_content("missing name\n", "text/plain");
+                 return;
+               }
+
+               {
+                 std::lock_guard<std::mutex> lock(*state.now_playing_mutex);
+                 *state.now_playing = name;
+               }
+               res.set_content("ok\n", "text/plain");
+             });
 
     // Blockande lyssning (kör i separat tråd)
     svr.listen(host, port);

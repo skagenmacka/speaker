@@ -11,7 +11,7 @@ build: configure
 	cmake --build $(BUILD_DIR) -j $(JOBS)
 
 run: build
-	librespot --name "Speaker Dev (Mac)" --backend pipe --bitrate 160 \
+	librespot --name "Speaker Dev (Mac)" --backend pipe --bitrate 160 --onevent "$(CURDIR)/now_playing.sh" \
 	| ./$(BUILD_DIR)/apps/speaker/speaker
 
 clean:

@@ -12,6 +12,7 @@ interface State {
   reverb_wet: number;
   reverb_dry: number;
   dc_blocker_cutoff_hz: number;
+  now_playing: string;
 }
 
 function App() {
@@ -28,7 +29,8 @@ function App() {
         throw new Error(`Request failed: ${response.status}`);
       }
       return (await response.json()) as State;
-    }
+    },
+    refetchInterval: 2000,
   });
 
   // Set initial values for RulerPickers based on their intended ranges and defaults
@@ -102,6 +104,10 @@ function App() {
   return (
     <div className="min-h-screen bg-black" style={{ height: "100vh" }}>
       <div className="w-full h-full flex gap-8">
+        <div className="text-white">
+          <h1>SPELAR NU</h1>
+          <div className="text-zinc-300">{data?.now_playing || '-'}</div>
+        </div>
         <RulerPicker
           min={0}
           max={60}
