@@ -34,7 +34,7 @@ eller
 make run
 ``` 
 
-För att köra kontroll UI:t körs förljande kommando:
+För att köra kontroll UI:t körs följande kommando:
 ```bash
 npm run start
 ```
